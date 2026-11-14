@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProtoTwin 3D — Studio de pré-validation PCB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">ProtoTwin 3D</div>
+
+  <div class="tb-group" role="group" aria-label="Caméra">
+    <span class="tb-label">Caméra</span>
+    <div class="seg-ctl">
+      <button class="seg-btn" data-view="top">Dessus 2D</button>
+      <button class="seg-btn active" data-view="iso">Isométrique 3D</button>
+      <button class="seg-btn" data-view="bottom">Face dessous</button>
+    </div>
+  </div>
+
+  <div class="tb-group" role="group" aria-label="Rendu">
+    <span class="tb-label">Rendu</span>
+    <div class="seg-ctl">
+      <button class="seg-btn active" data-mode="studio">Studio</button>
+      <button class="seg-btn" data-mode="xray">Rayon X</button>
+      <button class="seg-btn" data-mode="thermal">Thermique FLIR</button>
+    </div>
+  </div>
+
+  <div class="tb-group">
+    <label class="tb-label" for="maskSelect">Vernis</label>
+    <select id="maskSelect">
+      <option value="green">Vert émeraude</option>
+      <option value="black">Noir mat</option>
+      <option value="blue">Bleu royal</option>
+    </select>
+  </div>
+
+  <div class="tb-group">
+    <label class="tb-label" for="gaugeSelect">Gabarit</label>
+    <select id="gaugeSelect">
+      <option value="none">Aucun</option>
+      <option value="finger">Doigt Ø 12 mm</option>
+      <option value="usbc">Prise USB-C</option>
+    </select>
+  </div>
+
+  <div class="tb-status">
+    <span id="boardName">—</span>
+    <span id="simInfo">t = 0.00 s</span>
+    <span id="fps">-- FPS</span>
+  </div>
+</header>
+
+<aside id="left">
+  <section class="panel">
+    <h2><span class="ttl">Import KiCad / Altium</span></h2>
+    <label class="field">Pick &amp; Place (.csv, .pos)
+      <input type="file" id="pnpFile" accept=".csv,.pos,.txt">
+    </label>
+    <label class="field">Netlist (.net, .csv), optionnelle
+      <input type="file" id="netFile" accept=".net,.csv,.txt">
+    </label>
+    <div class="btn-row stack">
+      <button id="btnImport" class="btn">Générer la scène 3D</button>
+      <button id="btnSample" class="btn">Exemple CSV</button>
+    </div>
+    <label class="field spaced">Maillage 3D (.stl, .obj)
+      <input type="file" id="meshFile" accept=".stl,.obj">
+    </label>
+    <div class="btn-row stack">
+      <button id="btnMeshClear" class="btn">Retirer le maillage</button>
+      <button id="btnDemo" class="btn">Carte de démo</button>
+    </div>
+    <p id="importStatus" class="note">Carte de démonstration chargée</p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="ttl">Injecteur de pannes</span></h2>
+    <label class="chk"><input type="checkbox" id="bugRled"> R_LED1 sous-dimensionnée</label>
+    <label class="chk"><input type="checkbox" id="bugBridge"> Pont de soudure U1 3–4</label>
+    <label class="chk"><input type="checkbox" id="bugLedRev"> LED2 inversée</label>
+    <label class="chk"><input type="checkbox" id="bugShort"> Court-circuit 3V3–GND</label>
+    <button id="btnFix" class="btn primary wide">Corriger les 3 bugs du PCB</button>
+    <ul id="diagList" class="diag"></ul>
+  </section>
+
+  <section class="panel">
+    <h2><span class="ttl">Firmware MCU</span><span id="mcuStatus" class="pill">Arrêt</span></h2>
+    <div class="field-row">
+      <select id="fwPreset" aria-label="Programme">
+        <option value="demo">Potentiomètre → PWM + bouton</option>
+        <option value="blink">Clignotant 2 Hz</option>
+        <option value="breath">Respiration LED</option>
+      </select>
+      <select id="pwmFreq" aria-label="Fréquence PWM">
+        <option value="250">250 Hz</option>
+        <option value="500" selected>500 Hz</option>
+        <option value="1000">1 kHz</option>
+      </select>
+    </div>
+    <textarea id="fwCode" spellcheck="false" rows="10" aria-label="Code du firmware"></textarea>
+    <button id="btnFlash" class="btn wide">Flasher</button>
+    <p class="note">Appelé toutes les 1 ms : <code>mcu.adc('PA0')</code> <code>mcu.pwm('PA2', d)</code> <code>mcu.read('PA1')</code> <code>mcu.write('PA3', v)</code> <code>mcu.millis</code> <code>mem</code></p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="ttl">Interactions 3D</span></h2>
+    <ul class="help">
+      <li><span class="keys"><kbd>Clic</kbd></span><span>Sonde rouge sur une patte ou une pastille</span></li>
+      <li><span class="keys"><kbd>Clic droit</kbd></span><span>Sonde noire, ou <kbd>Maj</kbd> <kbd>Clic</kbd></span></li>
+      <li><span class="keys"><kbd>Maintenir</kbd></span><span>Enfoncer SW1 ou RESET</span></li>
+      <li><span class="keys"><kbd>Molette</kbd></span><span>Tourner RV1 au survol</span></li>
+      <li><span class="keys"><kbd>Glisser</kbd></span><span>Orbite, panoramique au bouton droit</span></li>
+    </ul>
+  </section>
+</aside>
+
+<main id="viewport">
+  <div id="tooltip" hidden></div>
+  <div id="thermalLegend" hidden>
+    <span>25 °C</span><div class="flir-bar"></div><span>140 °C</span>
+    <b id="hotSpot"></b>
+  </div>
+  <div id="gaugeStatus" hidden></div>
+  <div id="loadError" hidden></div>
+</main>
+
+<aside id="right">
+  <section class="panel inst psu">
+    <h2><span class="des">PSU</span><span class="ttl">Alimentation CC/CV</span><span id="psuMode" class="led-ind">CV</span></h2>
+    <div class="readouts">
+      <div class="readout">
+        <span class="lbl">Tension</span>
+        <div class="fig"><span id="psuVDisp">0.00</span><small>V</small></div>
+      </div>
+      <div class="readout">
+        <span class="lbl">Courant</span>
+        <div class="fig"><span id="psuIDisp">0.000</span><small>A</small></div>
+      </div>
+    </div>
+    <label class="slider">Consigne de tension <output id="psuVSet">5.0 V</output>
+      <input type="range" id="psuV" min="0" max="15" step="0.1" value="5">
+    </label>
+    <label class="slider">Limite de courant <output id="psuISet">0.50 A</output>
+      <input type="range" id="psuI" min="0.05" max="3" step="0.05" value="0.5">
+    </label>
+    <div class="btn-row">
+      <button id="psuOut" class="btn toggle on">Sortie on</button>
+      <span id="psuP" class="pill">0.00 W</span>
+    </div>
+  </section>
+
+  <section class="panel inst dmm">
+    <h2><span class="des">DMM</span><span class="ttl">Multimètre</span></h2>
+    <div class="readout big"><span id="dmmDisp">----</span><small id="dmmUnit">V DC</small></div>
+    <div class="seg-ctl full">
+      <button class="seg-btn active" data-dmm="vdc">V DC</button>
+      <button class="seg-btn" data-dmm="ohm">Résistance</button>
+      <button class="seg-btn" data-dmm="cont">Continuité</button>
+    </div>
+    <p id="dmmProbes" class="note mono">Sonde rouge : — · Sonde noire : —</p>
+    <button id="btnProbeReset" class="btn wide">Ranger les sondes</button>
+  </section>
+
+  <section class="panel inst scope">
+    <h2><span class="des">OSC</span><span class="ttl">Oscilloscope 2 voies</span><span id="scopeState" class="led-ind">Run</span></h2>
+    <canvas id="scope" width="640" height="400"></canvas>
+    <div class="field-row three">
+      <select id="scopeTime" aria-label="Base de temps">
+        <option value="0.0005">0.5 ms/div</option>
+        <option value="0.001">1 ms/div</option>
+        <option value="0.002" selected>2 ms/div</option>
+        <option value="0.005">5 ms/div</option>
+        <option value="0.02">20 ms/div</option>
+        <option value="0.1">100 ms/div</option>
+      </select>
+      <select id="scopeVdiv" aria-label="Sensibilité verticale">
+        <option value="0.5">0.5 V/div</option>
+        <option value="1" selected>1 V/div</option>
+        <option value="2">2 V/div</option>
+        <option value="5">5 V/div</option>
+      </select>
+      <select id="scopeTrig" aria-label="Déclenchement">
+        <option value="rise">Front ↑</option>
+        <option value="fall">Front ↓</option>
+        <option value="none">Défilement</option>
+      </select>
+    </div>
+    <div class="btn-row split">
+      <button id="btnScopeRun" class="btn">Run / Stop</button>
+      <button id="btnScopeSingle" class="btn">Single</button>
+    </div>
+    <p id="scopeInfo" class="note mono">CH1 = sonde rouge · CH2 = sonde noire (référence GND)</p>
+  </section>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="physics_and_circuit_solver.js"></script>
+<script src="pcb_3d_builder.js"></script>
+<script src="app_controller_and_instruments.js"></script>
+</body>
+</html>

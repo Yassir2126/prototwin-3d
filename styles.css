@@ -1,0 +1,326 @@
+/* ProtoTwin 3D — banc de mesure : chrome graphite, filets de 1 px, un seul accent.
+   La couleur vit dans la carte 3D et sur l'écran de l'oscilloscope, nulle part ailleurs.
+   Passe de design d'après unslop, de Damir Sokolovsky (@heydamir), CC BY 4.0 — github.com/heydamir/unslop */
+:root {
+  --s0: #0f0f10;                       /* surface la plus profonde : panneaux latéraux, scène */
+  --s1: #141415;                       /* fond de page, champs de saisie */
+  --s2: #19191b;                       /* puits d'affichage, infobulles */
+  --s3: #232325;                       /* surface relevée : boutons, état actif */
+  --s4: #2c2c2f;                       /* survol d'une surface relevée */
+  --line: rgba(237, 237, 237, 0.08);
+  --line-2: rgba(237, 237, 237, 0.16);
+  --t1: #ededed;
+  --t2: #a1a1a6;
+  --t3: #85858b;
+  --accent: #f5b83d;                   /* ambre de la trace CH1 : sélection et focus uniquement */
+  --pos: #4cc38a;
+  --neg: #e5484d;
+  --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --r: 6px;                            /* rayon unique des contrôles ; 4 px pour ce qui s'y imbrique */
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--s1);
+  color: var(--t1);
+  font: 400 13px/20px var(--sans);
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-areas: "top top top" "left view right";
+}
+
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Bandeau ---------- */
+#topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 16px;
+  background: var(--s0);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.brand { font-size: 16px; line-height: 1; font-weight: 500; }
+.tb-group { display: flex; align-items: center; gap: 8px; }
+.tb-label { font-size: 12px; line-height: 16px; color: var(--t3); }
+.tb-status {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  font: 400 12px/16px var(--mono);
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+#simInfo { min-width: 96px; text-align: right; }
+#fps { min-width: 56px; text-align: right; }
+
+/* Sélecteur segmenté : l'état actif est un simple palier de surface */
+.seg-ctl {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.seg-ctl.full { display: flex; margin-top: 12px; }
+.seg-ctl.full .seg-btn { flex: 1; padding: 0 4px; }
+.seg-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+.seg-btn:hover { color: var(--t1); }
+.seg-btn.active { background: var(--s3); color: var(--t1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+
+select {
+  height: 32px;
+  padding: 0 28px 0 12px;
+  background: var(--s2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2385858b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color 140ms var(--ease);
+}
+select:hover { border-color: var(--line-2); }
+
+/* ---------- Panneaux latéraux : sections à plat séparées par un filet ---------- */
+#left, #right { overflow-y: auto; background: var(--s0); scrollbar-width: thin; scrollbar-color: var(--s3) transparent; }
+#left { grid-area: left; border-right: 1px solid var(--line); }
+#right { grid-area: right; border-left: 1px solid var(--line); }
+#left::-webkit-scrollbar, #right::-webkit-scrollbar { width: 8px; }
+#left::-webkit-scrollbar-thumb, #right::-webkit-scrollbar-thumb { background: var(--s3); border-radius: 4px; }
+
+.panel { padding: 20px 16px; border-bottom: 1px solid var(--line); }
+.panel h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.panel h2 .ttl { flex: 1; min-width: 0; white-space: nowrap; }
+.des { font: 400 12px/20px var(--mono); color: var(--t3); }   /* repère d'instrument, comme sur une face avant */
+
+.note { margin: 12px 0 0; font-size: 12px; line-height: 16px; color: var(--t3); }
+.note.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.note code {
+  display: inline-block;
+  margin: 4px 0 0;
+  padding: 0 4px;
+  font: 400 12px/16px var(--mono);
+  color: var(--t2);
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.field { display: grid; gap: 4px; margin-bottom: 12px; font-size: 12px; line-height: 16px; color: var(--t3); }
+.field.spaced { margin-top: 20px; }
+input[type="file"] { width: 100%; font-size: 12px; color: var(--t2); }
+input[type="file"]::file-selector-button {
+  height: 32px;
+  margin-right: 12px;
+  padding: 0 12px;
+  font: 400 13px/1 var(--sans);
+  color: var(--t1);
+  background: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease);
+}
+input[type="file"]::file-selector-button:hover { background: var(--s4); }
+
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; margin-bottom: 8px; }
+.field-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field-row select { width: 100%; min-width: 0; }
+.btn-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.btn-row.split .btn { flex: 1; }
+.btn-row.stack { flex-direction: column; align-items: stretch; }
+
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 140ms var(--ease), border-color 140ms var(--ease), transform 140ms var(--ease);
+}
+.btn:hover { background: var(--s4); border-color: var(--line-2); }
+.btn:active { transform: scale(0.98); }
+.btn.wide { width: 100%; margin-top: 12px; }
+.btn.primary { background: var(--t1); border-color: transparent; color: var(--s1); font-weight: 500; }
+.btn.primary:hover { background: #ffffff; }
+.btn.toggle::before, .led-ind::before, .pill.run::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--pos);
+  vertical-align: 1px;
+}
+.btn.toggle:not(.on)::before { background: transparent; box-shadow: inset 0 0 0 1px var(--t3); }
+
+/* Cases à cocher : une ligne de 32 px, l'accent marque la sélection */
+.chk { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--t2); cursor: pointer; }
+.chk input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--s2);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease), border-color 140ms var(--ease);
+}
+.chk input:checked {
+  border-color: var(--accent);
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23141415' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 8 3 3 5-6'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+.chk input:disabled { opacity: 0.4; cursor: default; }
+
+.diag { list-style: none; margin: 12px 0 0; padding: 0; }
+.diag:empty { margin: 0; }
+.diag li { position: relative; padding: 4px 0 4px 16px; font-size: 12px; line-height: 16px; color: var(--t2); }
+.diag li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--t3); }
+.diag li.ok::before { background: var(--pos); }
+.diag li.bad::before { background: var(--neg); }
+
+#fwCode {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font: 400 12px/16px var(--mono);
+  tab-size: 2;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  resize: vertical;
+}
+
+/* États : texte discret et point de couleur sémantique, jamais de pastille */
+.led-ind, .pill { font: 400 12px/20px var(--mono); color: var(--t2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.led-ind.cc { color: var(--t1); }
+.led-ind.cc::before { background: var(--neg); }
+.led-ind.off::before, .led-ind.stop::before { background: transparent; box-shadow: inset 0 0 0 1px var(--t3); }
+.pill { color: var(--t3); }
+.pill.run { color: var(--t2); }
+.pill.err { color: var(--neg); white-space: normal; }
+.btn-row .pill { margin-left: auto; }
+
+.help { list-style: none; margin: 0; padding: 0; }
+.help li { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; padding: 4px 0; font-size: 12px; line-height: 20px; color: var(--t2); }
+kbd {
+  display: inline-block;
+  padding: 0 4px;
+  font: 400 12px/18px var(--mono);
+  color: var(--t1);
+  background: var(--s3);
+  border: 1px solid var(--line);
+  border-bottom-color: var(--line-2);
+  border-radius: 4px;
+}
+
+/* ---------- Scène 3D ---------- */
+#viewport { grid-area: view; position: relative; min-width: 0; min-height: 0; background: var(--s0); }
+#viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#tooltip, #thermalLegend, #gaugeStatus, #loadError {
+  position: absolute;
+  background: var(--s2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--t2);
+}
+#tooltip { z-index: 5; padding: 4px 8px; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; transform: translate(12px, 12px); }
+#tooltip b, #gaugeStatus b { font-weight: 500; color: var(--t1); }
+#thermalLegend { left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+#thermalLegend b { margin-left: 8px; font-weight: 400; color: var(--t1); }
+.flir-bar { width: 160px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, #1c0063, #210073 3%, #bf0d80 31%, #f2591a 54%, #ffbf1a 77%, #fffff2); }   /* échelle de la caméra thermique */
+#gaugeStatus { right: 16px; bottom: 16px; max-width: 320px; padding: 8px 12px 8px 28px; }
+#gaugeStatus::before, #loadError::before { content: ""; position: absolute; left: 12px; top: 13px; width: 6px; height: 6px; border-radius: 50%; background: var(--pos); }
+#gaugeStatus.blocked::before, #loadError::before { background: var(--neg); }
+#loadError { z-index: 9; top: 96px; left: 64px; right: 64px; padding: 12px 16px 12px 28px; font-size: 13px; line-height: 20px; color: var(--t1); }
+#loadError::before { top: 19px; }
+
+/* ---------- Instruments ---------- */
+.readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.readout { display: grid; gap: 4px; padding: 12px; background: var(--s2); border: 1px solid var(--line); border-radius: var(--r); }
+.readout .lbl { font-size: 12px; line-height: 16px; color: var(--t3); }
+.fig, .readout.big { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; }
+.fig span, .readout.big span { font: 500 28px/32px var(--mono); font-variant-numeric: tabular-nums; }
+.fig small, .readout.big small { font: 400 12px/16px var(--mono); color: var(--t3); }
+.fig small { min-width: 12px; }
+.readout.big { padding: 16px 12px; }
+.readout.big span { font-size: 32px; line-height: 36px; }
+.readout.big small { min-width: 40px; }
+.readout.big.beep span { color: var(--pos); }                 /* continuité établie */
+.psu:has(#psuMode.cc) #psuIDisp { color: var(--neg); }        /* limitation de courant active */
+
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; margin-top: 16px; font-size: 12px; line-height: 16px; color: var(--t3); }
+.slider output { font-family: var(--mono); color: var(--t2); font-variant-numeric: tabular-nums; }
+.slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.slider input::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); border-radius: 1px; }
+.slider input::-moz-range-track { height: 2px; background: var(--line-2); border-radius: 1px; }
+.slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 16px; margin-top: -7px; background: var(--t1); border: 0; border-radius: 2px; }
+.slider input::-moz-range-thumb { width: 8px; height: 16px; background: var(--t1); border: 0; border-radius: 2px; }
+
+#scope { display: block; width: 100%; height: auto; margin-bottom: 12px; background: #0c0c0d; border: 1px solid var(--line); border-radius: var(--r); }
+#scopeInfo { min-height: 32px; white-space: pre-line; }
+
+/* ---------- Écrans étroits ---------- */
+@media (max-width: 1500px) { #boardName { display: none; } }
+@media (max-width: 1240px) {
+  body { grid-template-columns: 240px minmax(0, 1fr) 288px; }
+  .tb-label { display: none; }
+  #topbar { gap: 16px; }
+}
+@media (max-width: 860px) {
+  html, body { height: auto; overflow: auto; }
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 56px 56vh auto auto; grid-template-areas: "top" "view" "right" "left"; }
+  #left, #right { border: 0; border-top: 1px solid var(--line); }
+  .tb-status { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
